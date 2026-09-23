@@ -46,7 +46,7 @@ FROM uv-installer AS production
 WORKDIR /app
 
 # Copy project configuration files first (for better layer caching)
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
 # Install Python dependencies with CUDA-enabled PyTorch
 # Use --extra webui to include Gradio for WebUI support
