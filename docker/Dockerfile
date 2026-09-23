@@ -45,17 +45,14 @@ FROM uv-installer AS production
 
 WORKDIR /app
 
-# Copy project configuration files first (for better layer caching)
-COPY pyproject.toml uv.lock README.md ./
+# Copy all project files (required for hatchling to find the package)
+COPY . .
 
 # Install Python dependencies with CUDA-enabled PyTorch
 # Use --extra webui to include Gradio for WebUI support
 RUN uv sync --extra webui \
     --index-strategy unsafe-best-match \
     --no-cache
-
-# Copy the rest of the application code
-COPY . .
 
 # Create directories for models and outputs
 RUN mkdir -p /app/checkpoints /app/outputs /app/prompts
