@@ -51,7 +51,7 @@ COPY pyproject.toml uv.lock ./
 # Install Python dependencies with CUDA-enabled PyTorch
 # Use --extra webui to include Gradio for WebUI support
 RUN uv sync --extra webui \
-    --index-strategyunsafe-best-match \
+    --index-strategy unsafe-best-match \
     --no-cache
 
 # Copy the rest of the application code
