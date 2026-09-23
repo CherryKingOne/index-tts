@@ -1,0 +1,95 @@
+# IndexTTS Docker Compose Configuration
+#
+# 使用方法:
+#   启动 WebUI:        docker compose up -d
+#   查看日志:          docker compose logs -f
+#   停止:              docker compose down
+#   重启:              docker compose restart
+#
+#   GPU 支持需要安装 NVIDIA Container Toolkit:
+#     https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+
+services:
+  indextts:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: indextts:latest
+    container_name: indextts-webui
+    restart: unless-stopped
+
+    # GPU 资源配置
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    ports:
+      - "7860:7860"
+
+    volumes:
+      # 模型目录 (持久化模型文件，避免重复下载)
+      - ${PWD}/checkpoints:/app/checkpoints
+      # 输出目录 (保存生成的音频)
+      - ${PWD}/outputs:/app/outputs
+      # 预设目录
+      - ${PWD}/prompts:/app/prompts
+
+    environment:
+      # PyTorch CUDA 内存配置
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+
+    # 启动命令参数覆盖
+    command: ["--host", "0.0.0.0", "--port", "7860", "--model_dir", "/app/checkpoints", "--version", "2.5"]
+
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # 网络
+    networks:
+      - indextts-net
+
+  # 可选: CLI 推理服务
+  indextts-cli:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: indextts:latest
+    container_name: indextts-cli
+    profiles:
+      - cli  # 只有显式指定时才会启动
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ${PWD}/checkpoints:/app/checkpoints
+      - ${PWD}/outputs:/app/outputs
+      - ${PWD}/prompts:/app/prompts
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+    entrypoint: ["uv", "run", "indextts2"]
+    networks:
+      - indextts-net
+
+networks:
+  indextts-net:
+    driver: bridge
