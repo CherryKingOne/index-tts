@@ -8,40 +8,29 @@
 #   docker run --gpus all -p 7860:7860 -v $(pwd)/checkpoints:/app/checkpoints -v $(pwd)/outputs:/app/outputs indextts:latest
 
 # ============================================================
-# Stage 1: Base image with CUDA + Python
+# Stage 1: Base image with CUDA + system tools
 # ============================================================
 FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04 AS base
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# Install system dependencies (no Python here, uv will manage it)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 \
-    python3.10-venv \
-    python3-pip \
     curl \
     ffmpeg \
     git \
     build-essential \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Set Python 3.10 as default
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+# ============================================================
+# Stage 2: Install latest uv package manager
+# ============================================================
+FROM base AS production
 
-# ============================================================
-# Stage 2: Install uv package manager
-# ============================================================
-FROM base AS uv-installer
-
-# Install uv (fast Python package manager)
-COPY --from=ghcr.io/astral-sh/uv:0.5.0 /uv /usr/local/bin/uv
-
-# ============================================================
-# Stage 3: Production image
-# ============================================================
-FROM uv-installer AS production
+# Install latest uv (supports extra-build-dependencies and Python version management)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
@@ -49,7 +38,7 @@ WORKDIR /app
 COPY . .
 
 # Install Python dependencies with CUDA-enabled PyTorch
-# Use --extra webui to include Gradio for WebUI support
+# uv will automatically install the Python version from .python-version
 RUN uv sync --extra webui \
     --index-strategy unsafe-best-match \
     --no-cache
